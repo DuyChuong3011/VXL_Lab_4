@@ -88,12 +88,12 @@ void Task_1_5s(void){
 }
 
 void Task_2s(void){
-//	HAL_GPIO_TogglePin(GPIOA, RED_3_Pin);
+	HAL_GPIO_TogglePin(GPIOA, RED_3_Pin);
 }
 
-void Task_2_5s(void){
-//	HAL_GPIO_TogglePin(GPIOA, RED_4_Pin);
-}
+//void Task_2_5s(void){
+////	HAL_GPIO_TogglePin(GPIOA, RED_4_Pin);
+//}
 
 void OneShot_TestTask(void){
 	// Task test One-shot: Chỉ chạy 1 lần sau 3s
@@ -151,10 +151,10 @@ int main(void)
 //    HAL_GPIO_WritePin(GPIOA, LED_RED_Pin | RED_1_Pin | RED_2_Pin | RED_3_Pin | RED_4_Pin, GPIO_PIN_SET);
     // Thêm 5 task chạy định kỳ
     // Sử dụng DELAY khác nhau để tránh Task Overlap (theo 2.3.11 trong PDF)
-//    SCH_Add_Task(Task_500ms, 0, 50); // Chạy ngay (delay 0), chu kỳ 500ms (50 ticks)
-//    SCH_Add_Task(Task_1s, 50, 100); // Chạy sau 0.5s, chu kỳ 1s (100 ticks)
-//    SCH_Add_Task(Task_1_5s, 100, 150); // Chạy sau 1s, chu kỳ 1.5s (150 ticks)
-//    SCH_Add_Task(Task_2s, 150, 200); // Chạy sau 1.5s, chu kỳ 2s (200 ticks)
+    SCH_Add_Task(Task_500ms, 0, 50); // Chạy ngay (delay 0), chu kỳ 500ms (50 ticks)
+    SCH_Add_Task(Task_1s, 50, 100); // Chạy sau 0.5s, chu kỳ 1s (100 ticks)
+    SCH_Add_Task(Task_1_5s, 100, 150); // Chạy sau 1s, chu kỳ 1.5s (150 ticks)
+    SCH_Add_Task(Task_2s, 150, 200); // Chạy sau 1.5s, chu kỳ 2s (200 ticks)
 //    SCH_Add_Task(Task_2_5s, 200, 250); // Chạy sau 2s, chu kỳ 2.5s (250 ticks)
     SCH_Add_Task(OneShot_TestTask, 300, 0);
 

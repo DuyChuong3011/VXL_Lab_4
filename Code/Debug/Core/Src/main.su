@@ -1,8 +1,7 @@
 main.c:78:6:Task_500ms	8	static
 main.c:82:6:Task_1s	8	static
 main.c:86:6:Task_1_5s	8	static
-main.c:90:6:Task_2s	4	static
-main.c:94:6:Task_2_5s	4	static
+main.c:90:6:Task_2s	8	static
 main.c:98:6:OneShot_TestTask	8	static
 main.c:106:6:TaskA	8	static
 main.c:111:6:TaskB	8	static

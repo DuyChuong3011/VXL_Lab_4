@@ -1,15 +1,23 @@
 #include "scheduler.h"
 #include "main.h"
-#include "stm32f1xx_hal.h"
 
 sTasks SCH_tasks_G[SCH_MAX_TASKS];
-// uint8_t current_index_task = 0;
-uint8_t Error_code_G = 0; 		 // Biến global lưu mã lỗi
-uint8_t Last_error_code_G = 0; 	 // Biến global lưu mã lỗi trước đó
-uint32_t Error_tick_count_G = 0; // Biến global đếm tick báo lỗi
+uint8_t currentTaskID = 0;
+uint8_t Error_code_G = 0;
+uint8_t Last_error_code_G = 0;
+uint32_t Error_tick_count_G = 0;
+
+#define NO_TASK_ID 0
+
+static uint32_t Get_New_Task_ID(void){
+    currentTaskID++;
+    if(currentTaskID == 0 || currentTaskID == NO_TASK_ID){
+        currentTaskID++; // Đảm bảo ID hợp lệ
+    }
+    return currentTaskID;
+}
 
 void SCH_Init(void){
-	// Khởi tạo tất cả pTask về 0x0000 (tức là xóa task)
 	for(int i=0; i<SCH_MAX_TASKS; i++){
 		SCH_tasks_G[i].pTask = 0x0000;
 		SCH_tasks_G[i].Delay = 0;
@@ -19,88 +27,120 @@ void SCH_Init(void){
 	Error_code_G = 0;
 	Last_error_code_G = 0;
 	Error_tick_count_G = 0;
-}
-
-// Hàm xóa task
-uint8_t SCH_Delete_Task(const uint32_t TASK_INDEX){
-	uint8_t Return_code;
-
-	if (TASK_INDEX >= SCH_MAX_TASKS) {
-		Return_code = RETURN_ERROR;
-	} else if(SCH_tasks_G[TASK_INDEX].pTask == 0) {
-		Error_code_G = ERROR_SCH_CANNOT_DELETE_TASK;
-		Return_code = RETURN_ERROR;
-	} else {
-		SCH_tasks_G[TASK_INDEX].pTask = 0x0000;
-		SCH_tasks_G[TASK_INDEX].Delay = 0;
-		SCH_tasks_G[TASK_INDEX].Period = 0;
-		SCH_tasks_G[TASK_INDEX].RunMe = 0;
-		Return_code = RETURN_NORMAL;
-	}
-
-	return Return_code;
+	currentTaskID=0;
 }
 
 // Hàm SCH_Add_Task (Hoàn thiện theo logic tìm vị trí trống)
 uint32_t SCH_Add_Task (void (*pFunction)(), uint32_t DELAY, uint32_t PERIOD){
-	int index = 0;
-	// Tìm vị trí trống (pTask == 0)
-	while((SCH_tasks_G[index].pTask != 0x0000) && (index < SCH_MAX_TASKS)){
-		index++;
+	uint8_t newTaskIndex = 0;
+	uint32_t sumDelay = 0;
+	uint32_t newDelay = 0;
+	uint32_t taskID;
+
+	for(newTaskIndex=0; newTaskIndex <SCH_MAX_TASKS; newTaskIndex++){
+
+		// Trường hợp 1: Chèn vào vị trí trống cuối cùng
+		if(SCH_tasks_G[newTaskIndex].pTask == 0x0000){
+			SCH_tasks_G[newTaskIndex] .Delay = DELAY - sumDelay;
+			break;
+		}
+
+		sumDelay += SCH_tasks_G[newTaskIndex].Delay;
+
+		// Trường hợp 2: Chèn vào giữa hai task đang hoạt động
+		if(sumDelay > DELAY){
+			newDelay = DELAY-(sumDelay-SCH_tasks_G[newTaskIndex].Delay);
+			SCH_tasks_G[newTaskIndex].Delay = sumDelay -DELAY;
+
+			for(uint8_t i = SCH_MAX_TASKS -1; i > newTaskIndex; i--){
+				SCH_tasks_G[i] = SCH_tasks_G[i-1];
+			}
+
+			SCH_tasks_G[newTaskIndex].pTask = pFunction;
+			SCH_tasks_G[newTaskIndex].Delay = newDelay;
+			SCH_tasks_G[newTaskIndex].Period = PERIOD;
+			SCH_tasks_G[newTaskIndex].RunMe = (newDelay == 0) ? 1 : 0;
+			taskID = Get_New_Task_ID();
+			SCH_tasks_G[newTaskIndex].TaskID = taskID;
+
+			return taskID;
+		}
 	}
 
-	if(index == SCH_MAX_TASKS){
-		// Task list is full
-		Error_code_G = ERROR_SCH_TOO_MANY_TASKS;
-		return SCH_MAX_TASKS; // Trả về mã lỗi/index không hợp lệ
+	// Nếu newTaskIndex < SCH_MAX_TASKS (chèn vào vị trí trống)
+	if(newTaskIndex < SCH_MAX_TASKS){
+		SCH_tasks_G[newTaskIndex].pTask = pFunction;
+		SCH_tasks_G[newTaskIndex].Period = PERIOD;
+		taskID = Get_New_Task_ID();
+		SCH_tasks_G[newTaskIndex].TaskID = taskID;
+		return taskID;
 	}
 
-	// Thêm task
-	SCH_tasks_G[index].pTask = pFunction;
-	SCH_tasks_G[index].Delay = DELAY;
-	SCH_tasks_G[index].Period = PERIOD;
-	SCH_tasks_G[index].RunMe = 0;
-	SCH_tasks_G[index].TaskID = index; // Gán ID chính là index
-
-	return index; // Trả về ID (index)
+	Error_code_G = ERROR_SCH_TOO_MANY_TASKS;
+	return SCH_MAX_TASKS;
 }
 
-// Hàm SCH_Update (Chỉnh sửa logic lặp và Delay/Period/RunMe)
-void SCH_Update(void){
-	for(int i=0; i< SCH_MAX_TASKS; i++){ // Lặp qua tất cả các vị trí
-		if(SCH_tasks_G[i].pTask != 0x0000){ // Chỉ xử lý nếu có task
-			if(SCH_tasks_G[i].Delay > 0){
-				SCH_tasks_G[i].Delay--;
-			}else{
-				// Task đến hạn chạy
-				SCH_tasks_G[i].RunMe += 1;
+uint8_t SCH_Delete_Task(const uint32_t taskID){
+	uint8_t Return_code = RETURN_ERROR;
+	uint8_t taskIndex;
+	uint8_t j;
 
-				if(SCH_tasks_G[i].Period > 0){
-					// Task định kỳ: nạp lại Delay
-					SCH_tasks_G[i].Delay = SCH_tasks_G[i].Period;
-				} else {
-					// Task One-shot (Period == 0), Delay vẫn giữ bằng 0
-					// Nó sẽ bị xóa trong Dispatch
-				}
+	if (taskID == 0 || taskID == NO_TASK_ID) return RETURN_ERROR;
+
+	for(taskIndex =0; taskIndex < SCH_MAX_TASKS; taskIndex++){
+		if(SCH_tasks_G[taskIndex].TaskID == taskID){
+			Return_code = RETURN_NORMAL;
+
+			if(taskIndex < SCH_MAX_TASKS - 1 &&
+				SCH_tasks_G[taskIndex+1].pTask != 0x0000){
+				SCH_tasks_G[taskIndex+1].Delay += SCH_tasks_G[taskIndex].Delay;
 			}
+
+			for(j = taskIndex; j < SCH_MAX_TASKS-1; j++)
+				SCH_tasks_G[j] = SCH_tasks_G[j+1];
+
+			SCH_tasks_G[j].pTask = 0x0000;
+			SCH_tasks_G[j].Period = 0;
+			SCH_tasks_G[j].Delay = 0;
+			SCH_tasks_G[j].RunMe = 0;
+			SCH_tasks_G[j].TaskID = 0;
+
+			return Return_code;
 		}
+	}
+
+	Error_code_G = ERROR_SCH_CANNOT_DELETE_TASK;
+	return Return_code;
+}
+
+
+void SCH_Update(void){
+	// Chỉ thao tác trên task đầu tiên (SCH_tasks_G[0])
+	if(SCH_tasks_G[0].pTask != 0x0000 && SCH_tasks_G[0].RunMe == 0){
+		if(SCH_tasks_G[0].Delay > 0) SCH_tasks_G[0].Delay--;
+
+		// Nếu Delay bằng 0, task sẵn sàng chạy
+		if (SCH_tasks_G[0].Delay == 0) SCH_tasks_G[0].RunMe = 1;
 	}
 }
 
 void SCH_Dispatch_Tasks(void){
-	for(int i=0; i<SCH_MAX_TASKS; i++){
-		if(SCH_tasks_G[i].pTask != 0x0000 && SCH_tasks_G[i].RunMe > 0){
-			// Chạy task
-			(*SCH_tasks_G[i].pTask)();
+	// Chi kiểm tra task đầu tiên
+	if(SCH_tasks_G[0].RunMe > 0 && SCH_tasks_G[0].pTask != 0x0000){
+		sTasks temtask = SCH_tasks_G[0];
 
-			// Giảm RunMe flag
-			SCH_tasks_G[i].RunMe--;
+		// 1. Chạy task
+		(*temtask.pTask)();
 
-			// Nếu là task one-shot (Period == 0) và đã chạy xong (RunMe đã về 0 hoặc là lần chạy cuối)
-			if(SCH_tasks_G[i].Period == 0 && SCH_tasks_G[i].RunMe == 0){
-				SCH_Delete_Task(i);
-			}
-		}
+		// 2. Giảm cờ RunMe
+		SCH_tasks_G[0].RunMe--;
+
+		// 3. Xóa task khỏi mảng
+		SCH_Delete_Task(temtask.TaskID);
+
+		// 4. Nếu là task định kỳ, thêm lại vào hàng đợi
+		if (temtask.Period != 0)
+			SCH_Add_Task(temtask.pTask, temtask.Period, temtask.Period);
 	}
 
 	// Report system status
