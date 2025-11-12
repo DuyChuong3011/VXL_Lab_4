@@ -5,8 +5,12 @@
 
 # Add inputs and outputs from these tool invocations to the build variables 
 C_SRCS += \
+../Core/Src/button.c \
+../Core/Src/fsm.c \
+../Core/Src/global.c \
 ../Core/Src/main.c \
 ../Core/Src/scheduler.c \
+../Core/Src/software_timer.c \
 ../Core/Src/stm32f1xx_hal_msp.c \
 ../Core/Src/stm32f1xx_it.c \
 ../Core/Src/syscalls.c \
@@ -14,8 +18,12 @@ C_SRCS += \
 ../Core/Src/system_stm32f1xx.c 
 
 OBJS += \
+./Core/Src/button.o \
+./Core/Src/fsm.o \
+./Core/Src/global.o \
 ./Core/Src/main.o \
 ./Core/Src/scheduler.o \
+./Core/Src/software_timer.o \
 ./Core/Src/stm32f1xx_hal_msp.o \
 ./Core/Src/stm32f1xx_it.o \
 ./Core/Src/syscalls.o \
@@ -23,8 +31,12 @@ OBJS += \
 ./Core/Src/system_stm32f1xx.o 
 
 C_DEPS += \
+./Core/Src/button.d \
+./Core/Src/fsm.d \
+./Core/Src/global.d \
 ./Core/Src/main.d \
 ./Core/Src/scheduler.d \
+./Core/Src/software_timer.d \
 ./Core/Src/stm32f1xx_hal_msp.d \
 ./Core/Src/stm32f1xx_it.d \
 ./Core/Src/syscalls.d \

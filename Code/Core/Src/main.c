@@ -22,6 +22,9 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include "software_timer.h"
+#include "fsm.h"
+#include "button.h"
 #include "scheduler.h"
 /* USER CODE END Includes */
 
@@ -32,12 +35,6 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-//#define PERIOD_500MS  50
-//#define PERIOD_1S    100
-//#define PERIOD_1_5S  150
-//#define PERIOD_2S    200
-//#define PERIOD_2_5S  250
-/* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
 /* USER CODE BEGIN PM */
@@ -57,11 +54,6 @@ static void MX_TIM2_Init(void);
 static void MX_GPIO_Init(void);
 /* USER CODE BEGIN PFP */
 
-//void Task_500ms(void);
-//void Task_1s(void);
-//void Task_1_5s(void);
-//void Task_2s(void);
-//void Task_2_5s(void);
 
 /* USER CODE END PFP */
 
@@ -75,49 +67,9 @@ static void MX_GPIO_Init(void);
   * @retval int
   */
 
-void Task_500ms(){
-	HAL_GPIO_TogglePin(GPIOA, LED_RED_Pin);
+void LED_Blinky(void){
+	HAL_GPIO_TogglePin(LED_RED_GPIO_Port, LED_RED_Pin);
 }
-
-void Task_1s(void){
-	HAL_GPIO_TogglePin(GPIOA, RED_1_Pin);
-}
-
-void Task_1_5s(void){
-	HAL_GPIO_TogglePin(GPIOA, RED_2_Pin);
-}
-
-void Task_2s(void){
-	HAL_GPIO_TogglePin(GPIOA, RED_3_Pin);
-}
-
-//void Task_2_5s(void){
-////	HAL_GPIO_TogglePin(GPIOA, RED_4_Pin);
-//}
-
-void OneShot_TestTask(void){
-	// Task test One-shot: Chỉ chạy 1 lần sau 3s
-	// Đảo trạng thái LED_RED_Pin (Toggle)
-	HAL_GPIO_TogglePin(LED_RED_GPIO_Port, RED_4_Pin);
-	// Sau đó task sẽ bị xóa
-}
-
-// Test tính Non-preemtive
-void TaskA(void){
-	HAL_GPIO_TogglePin(GPIOA, RED_1_Pin);
-	HAL_Delay(1000);
-}
-
-void TaskB(void){
-	HAL_GPIO_TogglePin(GPIOA, RED_2_Pin);
-}
-
-void Error_Test_Task(void){
-    // Test Xóa Task không hợp lệ
-    // Cố gắng xóa vị trí task 30 (SCH_MAX_TASKS=40)
-    SCH_Delete_Task(30);
-}
-
 int main(void)
 {
   /* USER CODE BEGIN 1 */
@@ -148,15 +100,12 @@ int main(void)
 
     // Khởi tạo Scheduler
     SCH_Init();
-//    HAL_GPIO_WritePin(GPIOA, LED_RED_Pin | RED_1_Pin | RED_2_Pin | RED_3_Pin | RED_4_Pin, GPIO_PIN_SET);
-    // Thêm 5 task chạy định kỳ
-    // Sử dụng DELAY khác nhau để tránh Task Overlap (theo 2.3.11 trong PDF)
-    SCH_Add_Task(Task_500ms, 0, 50); // Chạy ngay (delay 0), chu kỳ 500ms (50 ticks)
-    SCH_Add_Task(Task_1s, 50, 100); // Chạy sau 0.5s, chu kỳ 1s (100 ticks)
-    SCH_Add_Task(Task_1_5s, 100, 150); // Chạy sau 1s, chu kỳ 1.5s (150 ticks)
-    SCH_Add_Task(Task_2s, 150, 200); // Chạy sau 1.5s, chu kỳ 2s (200 ticks)
-//    SCH_Add_Task(Task_2_5s, 200, 250); // Chạy sau 2s, chu kỳ 2.5s (250 ticks)
-    SCH_Add_Task(OneShot_TestTask, 300, 0);
+//    SCH_Add_Task(OneShot_TestTask, 300, 0);
+
+    SCH_Add_Task(LED_Blinky, 0, 100);
+    SCH_Add_Task(timerRun,	0,	1);
+    SCH_Add_Task(getKeyInput, 0, 1);
+    SCH_Add_Task(fsm_auto_2way_run, 0, 1);
 
 //    SCH_Add_Task(TaskA, 100, 100);
 //    SCH_Add_Task(TaskB, 100, 100);
@@ -177,14 +126,13 @@ int main(void)
   {
     /* USER CODE END WHILE */
 	  SCH_Dispatch_Tasks();
-
-	  // --- Dùng để DEBUG/Kiểm tra ---
-	   if (Error_code_G != 0) {
-	       // Báo hiệu bằng LED nếu phát hiện lỗi
-	       HAL_GPIO_WritePin(GPIOA, TEST_PIN_Pin, GPIO_PIN_RESET);
-	   } else {
-	       HAL_GPIO_WritePin(GPIOA, TEST_PIN_Pin, GPIO_PIN_SET);
-	   }
+      // --- Dùng để DEBUG/Kiểm tra ---
+      if (Error_code_G != 0) {
+          // Báo hiệu bằng LED nếu phát hiện lỗi
+          HAL_GPIO_WritePin(GPIOA, TEST_PIN_Pin, GPIO_PIN_RESET);
+      } else {
+          HAL_GPIO_WritePin(GPIOA, TEST_PIN_Pin, GPIO_PIN_SET);
+      }
     /* USER CODE BEGIN 3 */
   }
   /* USER CODE END 3 */
@@ -280,20 +228,44 @@ static void MX_GPIO_Init(void)
   GPIO_InitTypeDef GPIO_InitStruct = {0};
 
   /* GPIO Ports Clock Enable */
+  __HAL_RCC_GPIOC_CLK_ENABLE();
   __HAL_RCC_GPIOA_CLK_ENABLE();
+  __HAL_RCC_GPIOB_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOA, LED_RED_Pin|RED_1_Pin|RED_2_Pin|RED_3_Pin
-                          |RED_4_Pin|TEST_PIN_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOA, EN0_Pin|EN1_Pin|EN2_Pin|EN3_Pin
+                          |LED_RED_Pin|TEST_PIN_Pin|RED_1_Pin|YELLOW_1_Pin
+                          |GREEN_1_Pin|RED_2_Pin|YELLOW_2_Pin|GREEN_2_Pin, GPIO_PIN_RESET);
 
-  /*Configure GPIO pins : LED_RED_Pin RED_1_Pin RED_2_Pin RED_3_Pin
-                           RED_4_Pin */
-  GPIO_InitStruct.Pin = LED_RED_Pin|RED_1_Pin|RED_2_Pin|RED_3_Pin
-                          |RED_4_Pin|TEST_PIN_Pin;
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0|GPIO_PIN_1|GPIO_PIN_2|GPIO_PIN_3
+                          |GPIO_PIN_4|GPIO_PIN_5|GPIO_PIN_6, GPIO_PIN_RESET);
+
+  /*Configure GPIO pins : Button_1_Pin Button_2_Pin Button_3_Pin */
+  GPIO_InitStruct.Pin = Button_1_Pin|Button_2_Pin|Button_3_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_PULLUP;
+  HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
+
+  /*Configure GPIO pins : EN0_Pin EN1_Pin EN2_Pin EN3_Pin
+                           LED_RED_Pin TEST_PIN_Pin RED_1_Pin YELLOW_1_Pin
+                           GREEN_1_Pin RED_2_Pin YELLOW_2_Pin GREEN_2_Pin */
+  GPIO_InitStruct.Pin = EN0_Pin|EN1_Pin|EN2_Pin|EN3_Pin
+                          |LED_RED_Pin|TEST_PIN_Pin|RED_1_Pin|YELLOW_1_Pin
+                          |GREEN_1_Pin|RED_2_Pin|YELLOW_2_Pin|GREEN_2_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+  /*Configure GPIO pins : PB0 PB1 PB2 PB3
+                           PB4 PB5 PB6 */
+  GPIO_InitStruct.Pin = GPIO_PIN_0|GPIO_PIN_1|GPIO_PIN_2|GPIO_PIN_3
+                          |GPIO_PIN_4|GPIO_PIN_5|GPIO_PIN_6;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
 }
 
