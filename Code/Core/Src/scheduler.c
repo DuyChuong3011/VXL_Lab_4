@@ -2,7 +2,6 @@
 #include "main.h"
 
 sTasks SCH_tasks_G[SCH_MAX_TASKS];
-// Sửa lỗi: Dùng uint32_t để tránh tràn ID
 uint32_t currentTaskID = 0;
 uint8_t Error_code_G = 0;
 uint8_t Last_error_code_G = 0;
@@ -32,7 +31,7 @@ void SCH_Init(void){
 	currentTaskID=0;
 }
 
-uint32_t SCH_Add_Task (void (*pFunction)(), uint32_t DELAY, uint32_t PERIOD){
+uint32_t SCH_Add_Task (void (*pFunction)(), uint32_t DELAY, uint32_t PERIOD, uint32_t existingID){
 	uint8_t newTaskIndex = 0;
 	uint32_t sumDelay = 0;
 	uint32_t newDelay = 0;
@@ -55,7 +54,7 @@ uint32_t SCH_Add_Task (void (*pFunction)(), uint32_t DELAY, uint32_t PERIOD){
 			SCH_tasks_G[newTaskIndex].Delay = newDelay;
 			SCH_tasks_G[newTaskIndex].Period = PERIOD;
 			SCH_tasks_G[newTaskIndex].RunMe = (newDelay == 0) ? 1 : 0;
-			taskID = Get_New_Task_ID();
+			taskID = (existingID != 0) ? existingID : Get_New_Task_ID();
 			SCH_tasks_G[newTaskIndex].TaskID = taskID;
 
 			return taskID;
@@ -64,13 +63,15 @@ uint32_t SCH_Add_Task (void (*pFunction)(), uint32_t DELAY, uint32_t PERIOD){
 	    // 2. Chèn vào cuối (Vị trí Trống)
 		if(SCH_tasks_G[newTaskIndex].pTask == 0x0000){
 
-	        // SỬA LỖI: Tính toán và gán Delay, RunMe chính xác
 	        SCH_tasks_G[newTaskIndex].Delay = DELAY - sumDelay;
 
 	        SCH_tasks_G[newTaskIndex].pTask = pFunction;
 	        SCH_tasks_G[newTaskIndex].Period = PERIOD;
 	        SCH_tasks_G[newTaskIndex].RunMe = (SCH_tasks_G[newTaskIndex].Delay == 0) ? 1 : 0;
 	        taskID = Get_New_Task_ID();
+	        SCH_tasks_G[newTaskIndex].TaskID = taskID;
+
+	        taskID = (existingID != 0) ? existingID : Get_New_Task_ID();
 	        SCH_tasks_G[newTaskIndex].TaskID = taskID;
 
 	        return taskID;
@@ -143,7 +144,7 @@ void SCH_Dispatch_Tasks(void){
 
 		// 4. Nếu là task định kỳ, thêm lại vào hàng đợi (O(N))
 		if (temtask.Period != 0)
-			SCH_Add_Task(temtask.pTask, temtask.Period, temtask.Period);
+			SCH_Add_Task(temtask.pTask, temtask.Period, temtask.Period, temtask.TaskID);
 	}
 
 	SCH_Report_Status();
@@ -151,7 +152,6 @@ void SCH_Dispatch_Tasks(void){
 	SCH_Go_To_Sleep();
 }
 
-// Hàm Report Status (Giữ nguyên)
 void SCH_Report_Status(void) {
 	#ifdef SCH_REPORT_ERRORS
 	if(Error_code_G != Last_error_code_G) {
@@ -171,7 +171,6 @@ void SCH_Report_Status(void) {
 	#endif
 }
 
-// Hàm Go To Sleep (Giữ nguyên)
 void SCH_Go_To_Sleep () {
 	// todo
 }

@@ -102,10 +102,10 @@ int main(void)
     SCH_Init();
 //    SCH_Add_Task(OneShot_TestTask, 300, 0);
 
-    SCH_Add_Task(LED_Blinky, 0, 100);
-    SCH_Add_Task(timerRun,	0,	1);
-    SCH_Add_Task(getKeyInput, 0, 1);
-    SCH_Add_Task(fsm_auto_2way_run, 0, 1);
+    uint32_t blink_task = SCH_Add_Task(LED_Blinky, 0, 100,0);
+    SCH_Add_Task(timerRun,	0,	1,0);
+    SCH_Add_Task(getKeyInput, 0, 1,0);
+    SCH_Add_Task(fsm_auto_2way_run, 0, 1,0);
 
 //    SCH_Add_Task(TaskA, 100, 100);
 //    SCH_Add_Task(TaskB, 100, 100);
